@@ -1,7 +1,42 @@
 # Create a VPC
 resource "aws_vpc" "file-upload-vpc" {
   cidr_block = "10.100.0.0/16"
-  default_security_group_id = null
+  enable_dns_hostnames = true
+  enable_dns_support = true
+}
+
+resource "aws_default_security_group" "default-sg-rds" {
+  vpc_id = data.aws_vpc.file-upload-vpc.id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "default-sg-rds-ingress" {
+  security_group_id = aws_default_security_group.default-sg-rds.id
+  ip_protocol = "All"
+  from_port = -1
+  to_port = -1
+  cidr_ipv4 = "0.0.0.0/0"
+}
+
+resource "aws_vpc_security_group_egress_rule" "default-sg-rds-egress" {
+  security_group_id = aws_default_security_group.default-sg-rds.id
+  ip_protocol = "All"
+  from_port = -1
+  to_port = -1
+  cidr_ipv4 = "0.0.0.0/0"
+}
+
+resource "aws_default_route_table" "file-upload-route-table" {
+  default_route_table_id  = aws_vpc.file-upload-vpc.default_route_table_id
+
+  route {
+    cidr_block = aws_vpc.file-upload-vpc.cidr_block
+    gateway_id = "local"
+  }
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.file-upload-igw.id
+  }
 }
 
 # Create a subnet within the VPC
@@ -9,6 +44,10 @@ resource "aws_subnet" "file-upload-subnet-az-1a" {
   vpc_id     = aws_vpc.file-upload-vpc.id
   cidr_block = "10.100.1.0/24"
   availability_zone = "ap-south-1a"
+}
+
+resource "aws_internet_gateway" "file-upload-igw" {
+  vpc_id = aws_vpc.file-upload-vpc.id
 }
 
 resource "aws_subnet" "file-upload-subnet-az-1b" {
@@ -27,25 +66,11 @@ resource "aws_db_subnet_group" "db_subnets" {
 }
 
 # Create a security group for the RDS instance
-resource "aws_security_group" "file-upload-sg" {
-  name        = "rds-sg"
-  description = "Security group for RDS"
-  vpc_id      = aws_vpc.file-upload-vpc.id
-
-  ingress {
-    from_port   = 0
-    to_port     = 3306
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-   egress {
-    from_port   = 0
-    to_port     = 65535
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
+# resource "aws_security_group" "file-upload-sg" {
+#   name        = "rds-sg"
+#   description = "Security group for RDS"
+#   vpc_id      = aws_vpc.file-upload-vpc.id
+# }
 
 # Create an RDS instance
 resource "aws_db_instance" "file-upload-rds" {
@@ -58,8 +83,9 @@ resource "aws_db_instance" "file-upload-rds" {
   username              = "admin"
   password              = "rdspassword"
   availability_zone     = "ap-south-1a"
+  publicly_accessible = true
   skip_final_snapshot = true
-  vpc_security_group_ids = [aws_security_group.file-upload-sg.id]
+  vpc_security_group_ids = [aws_default_security_group.default-sg-rds.id]
   db_subnet_group_name = aws_db_subnet_group.db_subnets.name  
 }
 
