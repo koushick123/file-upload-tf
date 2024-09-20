@@ -11,9 +11,9 @@ resource "aws_default_security_group" "default-sg-rds" {
 
 resource "aws_vpc_security_group_ingress_rule" "default-sg-rds-ingress" {
   security_group_id = aws_default_security_group.default-sg-rds.id
-  ip_protocol = "All"
-  from_port = -1
-  to_port = -1
+  ip_protocol = "tcp"
+  from_port = 3306
+  to_port = 3306
   cidr_ipv4 = "0.0.0.0/0"
 }
 
@@ -83,6 +83,7 @@ resource "aws_db_instance" "file-upload-rds" {
   username              = "admin"
   password              = "rdspassword"
   availability_zone     = "ap-south-1a"
+  db_name = "upload"
   publicly_accessible = true
   skip_final_snapshot = true
   vpc_security_group_ids = [aws_default_security_group.default-sg-rds.id]
@@ -116,4 +117,36 @@ resource "aws_dynamodb_table" "upload-table" {
     name = "file-id"
     type = "N"
   }
+}
+
+# Create AWS Secret Manager for RDS Login
+resource "aws_secretsmanager_secret" "rds-login-username-secret" {
+  name = "usernamesecret"
+  recovery_window_in_days = 0  
+}
+
+resource "aws_secretsmanager_secret" "rds-login-password-secret" {
+  name = "passwordsecret"
+  recovery_window_in_days = 0  
+}
+
+resource "aws_secretsmanager_secret" "rds-login-endpint-secret" {
+  name = "endpointsecret"
+  recovery_window_in_days = 0  
+}
+
+# Create AWS Secret values for RDS Login
+resource "aws_secretsmanager_secret_version" "rds-login-username" {
+  secret_id     = aws_secretsmanager_secret.rds-login-username-secret.id
+  secret_string = "admin"
+}
+
+resource "aws_secretsmanager_secret_version" "rds-login-password" {
+  secret_id     = aws_secretsmanager_secret.rds-login-password-secret.id
+  secret_string = "rdspassword"
+}
+
+resource "aws_secretsmanager_secret_version" "rds-login-endpoint" {
+  secret_id     = aws_secretsmanager_secret.rds-login-endpint-secret.id
+  secret_string = "jdbc:mysql://${data.aws_db_instance.file-upload-rds.endpoint}/${data.aws_db_instance.file-upload-rds.db_name}"
 }
