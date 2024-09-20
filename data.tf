@@ -14,4 +14,5 @@ data "aws_vpc" "file-upload-vpc" {
 
 data "aws_db_instance" "file-upload-rds" {
   db_instance_identifier = "file-upload"
+  depends_on = [ aws_db_instance.file-upload-rds ]
 }
