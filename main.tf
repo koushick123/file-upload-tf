@@ -1,12 +1,134 @@
-# Create a VPC
-resource "aws_vpc" "file-upload-vpc" {
+# AWS VPC for Application
+# Create Application VPC
+resource "aws_vpc" "file-upload-application-vpc" {
+  cidr_block = "10.200.0.0/16"
+  enable_dns_hostnames = true
+  enable_dns_support = true
+  tags = {
+    Name = "File-Upload-Application-VPC"
+  }
+}
+
+# Security Group for Application
+resource "aws_default_security_group" "default-sg-application" {
+  vpc_id = aws_vpc.file-upload-application-vpc.id
+  tags = {
+    Name = "File-Upload-Application-SG"
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "default-sg-application-ingress-ssh" {
+  security_group_id = aws_default_security_group.default-sg-application.id
+  ip_protocol = "tcp"
+  from_port = 22
+  to_port = 22
+  cidr_ipv4 = "0.0.0.0/0"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "default-sg-application-ingress-http" {
+  security_group_id = aws_default_security_group.default-sg-application.id
+  ip_protocol = "tcp"
+  from_port = 80
+  to_port = 80
+  cidr_ipv4 = "0.0.0.0/0"
+}
+
+resource "aws_vpc_security_group_egress_rule" "default-sg-application-egress" {
+  security_group_id = aws_default_security_group.default-sg-application.id
+  ip_protocol = "All"
+  from_port = -1
+  to_port = -1
+  cidr_ipv4 = "0.0.0.0/0"
+}
+
+# Route table for Application
+resource "aws_default_route_table" "file-upload-application-route-table" {
+  default_route_table_id  = aws_vpc.file-upload-application-vpc.default_route_table_id
+
+  route {
+    cidr_block = aws_vpc.file-upload-application-vpc.cidr_block
+    gateway_id = "local"
+  }
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.file-upload-application-igw.id
+  }
+  tags = {
+    Name = "File-Upload-Application-RT"
+  }
+}
+
+# Create a subnet within the Application VPC
+resource "aws_subnet" "file-upload-application-subnet-az-1a" {
+  vpc_id     = aws_vpc.file-upload-application-vpc.id
+  cidr_block = "10.200.1.0/24"
+  availability_zone = "ap-south-1a"
+  tags = {
+    Name = "File-Upload-Application-subnet"
+  }
+}
+
+resource "aws_internet_gateway" "file-upload-application-igw" {
+  vpc_id = aws_vpc.file-upload-application-vpc.id
+  tags = {
+    Name = "File-Upload-Application-IGW"
+  }
+}
+
+#=====================================================================
+
+# AWS EC2
+# Create EC2
+resource "aws_instance" "file-upload-instance" {
+  tags = {
+    Name = "File-Upload-Application"
+  }
+  ami = "ami-0dee22c13ea7a9a67"
+  instance_type = "t2.micro"
+  key_name = aws_key_pair.file-upload-key-pair.key_name
+  subnet_id = aws_subnet.file-upload-application-subnet-az-1a.id
+  vpc_security_group_ids = [ aws_default_security_group.default-sg-application.id ]
+  associate_public_ip_address = true
+  iam_instance_profile = aws_iam_instance_profile.file-upload-profile.name
+}
+
+# TLS Private Key
+resource "tls_private_key" "file-upload-private-key" {
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
+# EC2 Key Pair
+resource "aws_key_pair" "file-upload-key-pair" {
+  key_name = "file-upload-key"
+  public_key = tls_private_key.file-upload-private-key.public_key_openssh
+}
+
+# EC2 Instance profile
+resource "aws_iam_instance_profile" "file-upload-profile" {
+  name = "file-upload-profile"
+  role = aws_iam_role.file-upload-role.name
+}
+
+#=====================================================================
+# AWS RDS
+# Create a database VPC
+resource "aws_vpc" "file-upload-db-vpc" {
   cidr_block = "10.100.0.0/16"
   enable_dns_hostnames = true
   enable_dns_support = true
+  tags = {
+    Name = "File-Upload-DB"
+  }
 }
 
+# Security Group for database
 resource "aws_default_security_group" "default-sg-rds" {
-  vpc_id = data.aws_vpc.file-upload-vpc.id
+  vpc_id = aws_vpc.file-upload-db-vpc.id
+  tags = {
+    Name = "File-Upload-DB-SG"
+  }
 }
 
 resource "aws_vpc_security_group_ingress_rule" "default-sg-rds-ingress" {
@@ -25,11 +147,12 @@ resource "aws_vpc_security_group_egress_rule" "default-sg-rds-egress" {
   cidr_ipv4 = "0.0.0.0/0"
 }
 
+# Route table for database
 resource "aws_default_route_table" "file-upload-route-table" {
-  default_route_table_id  = aws_vpc.file-upload-vpc.default_route_table_id
+  default_route_table_id  = aws_vpc.file-upload-db-vpc.default_route_table_id
 
   route {
-    cidr_block = aws_vpc.file-upload-vpc.cidr_block
+    cidr_block = aws_vpc.file-upload-db-vpc.cidr_block
     gateway_id = "local"
   }
 
@@ -37,21 +160,30 @@ resource "aws_default_route_table" "file-upload-route-table" {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.file-upload-igw.id
   }
+  tags = {
+    Name = "File-Upload-DB-RT"
+  }
 }
 
-# Create a subnet within the VPC
+# Create a subnet within the database VPC
 resource "aws_subnet" "file-upload-subnet-az-1a" {
-  vpc_id     = aws_vpc.file-upload-vpc.id
+  vpc_id     = aws_vpc.file-upload-db-vpc.id
   cidr_block = "10.100.1.0/24"
   availability_zone = "ap-south-1a"
+  tags = {
+    Name = "File-Upload-DB-Subnet"
+  }
 }
 
 resource "aws_internet_gateway" "file-upload-igw" {
-  vpc_id = aws_vpc.file-upload-vpc.id
+  vpc_id = aws_vpc.file-upload-db-vpc.id
+  tags = {
+    Name = "File-Upload-IGW-DB"
+  }
 }
 
 resource "aws_subnet" "file-upload-subnet-az-1b" {
-  vpc_id     = aws_vpc.file-upload-vpc.id
+  vpc_id     = aws_vpc.file-upload-db-vpc.id
   cidr_block = "10.100.2.0/24"
   availability_zone = "ap-south-1b"
 }
@@ -64,13 +196,6 @@ resource "aws_db_subnet_group" "db_subnets" {
     Name = "My DB subnet group"
   }
 }
-
-# Create a security group for the RDS instance
-# resource "aws_security_group" "file-upload-sg" {
-#   name        = "rds-sg"
-#   description = "Security group for RDS"
-#   vpc_id      = aws_vpc.file-upload-vpc.id
-# }
 
 # Create an RDS instance
 resource "aws_db_instance" "file-upload-rds" {
@@ -90,11 +215,12 @@ resource "aws_db_instance" "file-upload-rds" {
   db_subnet_group_name = aws_db_subnet_group.db_subnets.name  
 }
 
+#=====================================================================
+# AWS S3
 # Create an S3 bucket
 resource "aws_s3_bucket" "media-bucket-2024" {
   bucket = "media-bucket-2024"
 }
-
 
 # Disable Block Public Access Settings
 resource "aws_s3_bucket_public_access_block" "my_bucket_public_access_block" {
@@ -106,6 +232,8 @@ resource "aws_s3_bucket_public_access_block" "my_bucket_public_access_block" {
   restrict_public_buckets  = false  # Allow public bucket
 }
 
+#=====================================================================
+# AWS Dynamo DB
 # Create a DynamoDB table
 resource "aws_dynamodb_table" "upload-table" {
   name           = "upload"
@@ -119,6 +247,50 @@ resource "aws_dynamodb_table" "upload-table" {
   }
 }
 
+#=====================================================================
+# IAM Access Policy
+# Create IAM Policy role with specific access to resources (AWS RDS, DynamodDB, S3)
+ resource "aws_iam_role" "file-upload-role" {
+   description = "Role to be used by application for file upload"
+  name = "file-upload-role"
+  assume_role_policy = data.aws_iam_policy_document.assume-role-policy.json
+}
+
+resource "aws_iam_policy" "file_upload_role_policy" {
+  name = "file-upload-role-policy"  
+  policy = data.aws_iam_policy_document.dynamodb-policy.json
+}
+
+resource "aws_iam_role_policy_attachment" "file-upload-policy-attach" {
+  role = aws_iam_role.file-upload-role.name
+  policy_arn = aws_iam_policy.file_upload_role_policy.arn
+}
+
+# # Create Policy for Dynamo DB restricting access to above role
+# resource "aws_dynamodb_resource_policy" "upload-table-policy" {
+#   resource_arn = aws_dynamodb_table.upload-table.arn
+#   policy = data.aws_iam_policy_document.file-upload-role-policy.json
+#   depends_on = [ aws_vpc.file-upload-application-vpc , aws_vpc_endpoint.file-upload-endpoint ]
+# }
+
+# Create VPC Endpoint (Interface)
+resource "aws_vpc_endpoint" "file-upload-endpoint" {
+  service_name = "com.amazonaws.ap-south-1.dynamodb"
+  auto_accept = true
+  vpc_id = aws_vpc.file-upload-application-vpc.id
+  subnet_ids = [aws_subnet.file-upload-application-subnet-az-1a.id]
+  vpc_endpoint_type = "Interface"
+  #depends_on = [ aws_dynamodb_table.upload-table ]
+}
+
+# VPC Endpoint policy
+resource "aws_vpc_endpoint_policy" "vpce-file-upload-policy" {
+  vpc_endpoint_id = aws_vpc_endpoint.file-upload-endpoint.id
+  policy = data.aws_iam_policy_document.dynamodb-policy.json
+}
+
+#=====================================================================
+# AWS Secret Manager
 # Create AWS Secret Manager for RDS Login
 resource "aws_secretsmanager_secret" "rds-login-username-secret" {
   name = "usernamesecret"
@@ -149,4 +321,17 @@ resource "aws_secretsmanager_secret_version" "rds-login-password" {
 resource "aws_secretsmanager_secret_version" "rds-login-endpoint" {
   secret_id     = aws_secretsmanager_secret.rds-login-endpint-secret.id
   secret_string = "jdbc:mysql://${data.aws_db_instance.file-upload-rds.endpoint}/${data.aws_db_instance.file-upload-rds.db_name}"
+}
+
+#=====================================================================
+# AWS SNS Notification
+# Create AWS SNS Topic and Subscription
+resource "aws_sns_topic" "mail-upload-topic" {
+  name = "mail-upload-topic"
+}
+
+resource "aws_sns_topic_subscription" "mail-upload-subscription" {
+  topic_arn = data.aws_sns_topic.email-upload-topic.arn
+  endpoint = "skoushicksuri@gmail.com"
+  protocol = "email"
 }
