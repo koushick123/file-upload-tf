@@ -15,6 +15,6 @@ output "dynamod-db-vpc-endpoint-dns" {
 }
 
 output "ec2_private_key" {
-  value = tls_private_key.file-upload-private-key.private_key_pem
-  sensitive = true
+  value = nonsensitive(tls_private_key.file-upload-private-key.private_key_pem)
+  # sensitive = true
 }

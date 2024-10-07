@@ -258,7 +258,7 @@ resource "aws_dynamodb_table" "upload-table" {
 
 resource "aws_iam_policy" "file_upload_role_policy" {
   name = "file-upload-role-policy"  
-  policy = data.aws_iam_policy_document.dynamodb-policy.json
+  policy = data.aws_iam_policy_document.file-upload-service-policy.json
 }
 
 resource "aws_iam_role_policy_attachment" "file-upload-policy-attach" {
@@ -286,7 +286,7 @@ resource "aws_vpc_endpoint" "file-upload-endpoint" {
 # VPC Endpoint policy
 resource "aws_vpc_endpoint_policy" "vpce-file-upload-policy" {
   vpc_endpoint_id = aws_vpc_endpoint.file-upload-endpoint.id
-  policy = data.aws_iam_policy_document.dynamodb-policy.json
+  policy = data.aws_iam_policy_document.dynamodb-policy-with-principal.json
 }
 
 #=====================================================================
