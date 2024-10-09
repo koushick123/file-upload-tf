@@ -90,7 +90,7 @@ resource "aws_instance" "file-upload-instance" {
   subnet_id = aws_subnet.file-upload-application-subnet-az-1a.id
   vpc_security_group_ids = [ aws_default_security_group.default-sg-application.id ]
   associate_public_ip_address = true
-  iam_instance_profile = aws_iam_instance_profile.file-upload-profile.name
+  iam_instance_profile = "${aws_iam_instance_profile.file-upload-profile.name}"
 }
 
 # TLS Private Key
@@ -108,7 +108,7 @@ resource "aws_key_pair" "file-upload-key-pair" {
 # EC2 Instance profile
 resource "aws_iam_instance_profile" "file-upload-profile" {
   name = "file-upload-profile"
-  role = aws_iam_role.file-upload-role.name
+  role = "${aws_iam_role.file-upload-role.name}"
 }
 
 #=====================================================================
@@ -256,22 +256,11 @@ resource "aws_dynamodb_table" "upload-table" {
   assume_role_policy = data.aws_iam_policy_document.assume-role-policy.json
 }
 
-resource "aws_iam_policy" "file_upload_role_policy" {
+resource "aws_iam_role_policy" "file_upload_role_policy" {
   name = "file-upload-role-policy"  
+  role = "${aws_iam_role.file-upload-role.id}"
   policy = data.aws_iam_policy_document.file-upload-service-policy.json
 }
-
-resource "aws_iam_role_policy_attachment" "file-upload-policy-attach" {
-  role = aws_iam_role.file-upload-role.name
-  policy_arn = aws_iam_policy.file_upload_role_policy.arn
-}
-
-# # Create Policy for Dynamo DB restricting access to above role
-# resource "aws_dynamodb_resource_policy" "upload-table-policy" {
-#   resource_arn = aws_dynamodb_table.upload-table.arn
-#   policy = data.aws_iam_policy_document.file-upload-role-policy.json
-#   depends_on = [ aws_vpc.file-upload-application-vpc , aws_vpc_endpoint.file-upload-endpoint ]
-# }
 
 # Create VPC Endpoint (Interface)
 resource "aws_vpc_endpoint" "file-upload-endpoint" {
@@ -334,4 +323,12 @@ resource "aws_sns_topic_subscription" "mail-upload-subscription" {
   topic_arn = data.aws_sns_topic.email-upload-topic.arn
   endpoint = "skoushicksuri@gmail.com"
   protocol = "email"
+}
+
+resource "aws_route53_record" "file-upload-route53-alias" {
+  zone_id = data.aws_route53_zone.my-file-upload-route53-zone.zone_id
+  name = "www.${data.aws_route53_zone.my-file-upload-route53-zone.name}"
+  type = "A"
+  ttl = "300"
+  records = [aws_instance.file-upload-instance.public_ip]
 }
