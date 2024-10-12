@@ -33,22 +33,18 @@ data "aws_iam_policy_document" "assume-role-policy" {
 
 data "aws_iam_policy_document" "file-upload-service-policy" {
   statement {
-    actions = ["dynamodb:PutItem","dynamodb:GetItem","secretsmanager:GetSecretValue","sns:Publish","s3:PutObject",
-				"s3:GetObject","s3:ListBucket"]
+    actions = ["dynamodb:PutItem","dynamodb:GetItem","secretsmanager:GetSecretValue","s3:PutObject","s3:GetObject","s3:ListBucket","sns:Publish"]
     effect = "Allow"
  
-    resources = [aws_dynamodb_table.upload-table.arn, aws_s3_bucket.media-bucket-2024.arn ,aws_sns_topic.mail-upload-topic.arn, aws_secretsmanager_secret.rds-login-endpint-secret.arn,
-    aws_secretsmanager_secret.rds-login-username-secret.arn, aws_secretsmanager_secret.rds-login-password-secret.arn]
-
-  #   condition {
-  #     test = "StringEquals"
-  #     variable = "aws:SourceVpce"
-  #     values = [data.aws_vpc_endpoint.vpc_endpoint_dynamodb_interface.id]
-  #   }
+    resources = [aws_dynamodb_table.upload-table.arn, aws_s3_bucket.media-bucket-2024.arn, "${aws_s3_bucket.media-bucket-2024.arn}/*" ,aws_sns_topic.mail-upload-topic.arn, 
+    aws_secretsmanager_secret.rds-login-endpint-secret.arn,
+    aws_secretsmanager_secret.rds-login-username-secret.arn, 
+    aws_secretsmanager_secret.rds-login-password-secret.arn,
+    aws_secretsmanager_secret.sns-topic-arn.arn]
   }
 }
 
-data "aws_iam_policy_document" "dynamodb-policy-with-principal" {
+data "aws_iam_policy_document" "dynamodb-resource-policy" {
   statement {
     actions = ["dynamodb:PutItem","dynamodb:GetItem"]
     effect = "Allow"
@@ -63,6 +59,24 @@ data "aws_iam_policy_document" "dynamodb-policy-with-principal" {
       test = "StringEquals"
       variable = "aws:SourceVpce"
       values = [data.aws_vpc_endpoint.vpc_endpoint_dynamodb_interface.id]
+    }
+  }
+
+  statement {
+    actions = ["dynamodb:PutItem","dynamodb:GetItem"]
+    effect = "Deny"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    resources = [aws_dynamodb_table.upload-table.arn]
+    # Since Deny takes precedence , below condition is required to ensure above principal is excluded
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = [aws_iam_role.file-upload-role.arn]
     }
   }
 }

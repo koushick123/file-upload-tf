@@ -247,6 +247,13 @@ resource "aws_dynamodb_table" "upload-table" {
   }
 }
 
+# Create Dynamo DB resource based policy
+resource "aws_dynamodb_resource_policy" "upload-table-policy" {
+  policy = data.aws_iam_policy_document.dynamodb-resource-policy.json
+  resource_arn = aws_dynamodb_table.upload-table.arn
+  confirm_remove_self_resource_access = false
+}
+
 #=====================================================================
 # IAM Access Policy
 # Create IAM Policy role with specific access to resources (AWS RDS, DynamodDB, S3)
@@ -262,6 +269,9 @@ resource "aws_iam_role_policy" "file_upload_role_policy" {
   policy = data.aws_iam_policy_document.file-upload-service-policy.json
 }
 
+#=====================================================================
+# VPC Endpoint
+
 # Create VPC Endpoint (Interface)
 resource "aws_vpc_endpoint" "file-upload-endpoint" {
   service_name = "com.amazonaws.ap-south-1.dynamodb"
@@ -275,7 +285,7 @@ resource "aws_vpc_endpoint" "file-upload-endpoint" {
 # VPC Endpoint policy
 resource "aws_vpc_endpoint_policy" "vpce-file-upload-policy" {
   vpc_endpoint_id = aws_vpc_endpoint.file-upload-endpoint.id
-  policy = data.aws_iam_policy_document.dynamodb-policy-with-principal.json
+  policy = data.aws_iam_policy_document.dynamodb-resource-policy.json
 }
 
 #=====================================================================
@@ -296,6 +306,11 @@ resource "aws_secretsmanager_secret" "rds-login-endpint-secret" {
   recovery_window_in_days = 0  
 }
 
+resource "aws_secretsmanager_secret" "sns-topic-arn" {
+  name = "fileuploadtopicarnsecret"
+  recovery_window_in_days = 0
+}
+
 # Create AWS Secret values for RDS Login
 resource "aws_secretsmanager_secret_version" "rds-login-username" {
   secret_id     = aws_secretsmanager_secret.rds-login-username-secret.id
@@ -311,6 +326,12 @@ resource "aws_secretsmanager_secret_version" "rds-login-endpoint" {
   secret_id     = aws_secretsmanager_secret.rds-login-endpint-secret.id
   secret_string = "jdbc:mysql://${data.aws_db_instance.file-upload-rds.endpoint}/${data.aws_db_instance.file-upload-rds.db_name}"
 }
+
+resource "aws_secretsmanager_secret_version" "sns-file-upload-topic-arn" {
+  secret_id = aws_secretsmanager_secret.sns-topic-arn.id
+  secret_string = aws_sns_topic.mail-upload-topic.arn
+}
+
 
 #=====================================================================
 # AWS SNS Notification
