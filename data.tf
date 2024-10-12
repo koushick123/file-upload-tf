@@ -44,6 +44,8 @@ data "aws_iam_policy_document" "file-upload-service-policy" {
   }
 }
 
+# DynamoDB resource policy 
+
 data "aws_iam_policy_document" "dynamodb-resource-policy" {
   statement {
     actions = ["dynamodb:PutItem","dynamodb:GetItem"]
@@ -72,6 +74,142 @@ data "aws_iam_policy_document" "dynamodb-resource-policy" {
     }
 
     resources = [aws_dynamodb_table.upload-table.arn]
+    # Since Deny takes precedence , below condition is required to ensure above principal is excluded
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = [aws_iam_role.file-upload-role.arn]
+    }
+  }
+}
+
+# AWS Secret usernamesecret resource policy
+
+data "aws_iam_policy_document" "secret-manager-usernamesecret-resource-policy" {
+  statement {
+    actions = ["secretsmanager:GetSecretValue"]
+    effect = "Allow"
+
+    principals {
+      type = "AWS"
+      identifiers = [aws_iam_role.file-upload-role.arn]
+    }
+
+    resources = [aws_secretsmanager_secret.rds-login-username-secret.arn]
+  }
+
+  statement {
+    actions = ["secretsmanager:GetSecretValue"]
+    effect = "Deny"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+      
+    resources = [aws_secretsmanager_secret.rds-login-username-secret.arn]
+    # Since Deny takes precedence , below condition is required to ensure above principal is excluded
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = [aws_iam_role.file-upload-role.arn]
+    }
+  }
+}
+
+# AWS Secret passwordsecret resource policy
+
+data "aws_iam_policy_document" "secret-manager-passwordsecret-resource-policy" {
+  statement {
+    actions = ["secretsmanager:GetSecretValue"]
+    effect = "Allow"
+
+    principals {
+      type = "AWS"
+      identifiers = [aws_iam_role.file-upload-role.arn]
+    }
+
+    resources = [aws_secretsmanager_secret.rds-login-password-secret.arn]
+  }
+
+  statement {
+    actions = ["secretsmanager:GetSecretValue"]
+    effect = "Deny"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+      
+    resources = [aws_secretsmanager_secret.rds-login-password-secret.arn]
+    # Since Deny takes precedence , below condition is required to ensure above principal is excluded
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = [aws_iam_role.file-upload-role.arn]
+    }
+  }
+}
+
+# AWS Secret endpointsecret resource policy
+
+data "aws_iam_policy_document" "secret-manager-endpointsecret-resource-policy" {
+  statement {
+    actions = ["secretsmanager:GetSecretValue"]
+    effect = "Allow"
+
+    principals {
+      type = "AWS"
+      identifiers = [aws_iam_role.file-upload-role.arn]
+    }
+
+    resources = [aws_secretsmanager_secret.rds-login-endpint-secret.arn]
+  }
+
+  statement {
+    actions = ["secretsmanager:GetSecretValue"]
+    effect = "Deny"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+      
+    resources = [aws_secretsmanager_secret.rds-login-endpint-secret.arn]
+    # Since Deny takes precedence , below condition is required to ensure above principal is excluded
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = [aws_iam_role.file-upload-role.arn]
+    }
+  }
+}
+
+# AWS Secret mailuploadtopic resource policy
+
+data "aws_iam_policy_document" "secret-manager-mailuploadtopic-resource-policy" {
+  statement {
+    actions = ["secretsmanager:GetSecretValue"]
+    effect = "Allow"
+
+    principals {
+      type = "AWS"
+      identifiers = [aws_iam_role.file-upload-role.arn]
+    }
+
+    resources = [aws_secretsmanager_secret.sns-topic-arn.arn]
+  }
+
+  statement {
+    actions = ["secretsmanager:GetSecretValue"]
+    effect = "Deny"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+      
+    resources = [aws_secretsmanager_secret.sns-topic-arn.arn]
     # Since Deny takes precedence , below condition is required to ensure above principal is excluded
     condition {
       test     = "ArnNotEquals"

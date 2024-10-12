@@ -332,6 +332,26 @@ resource "aws_secretsmanager_secret_version" "sns-file-upload-topic-arn" {
   secret_string = aws_sns_topic.mail-upload-topic.arn
 }
 
+# Create AWS Secret Manager resource based policies for all its secrets
+resource "aws_secretsmanager_secret_policy" "usernamesecretpolicy" {
+  secret_arn = aws_secretsmanager_secret.rds-login-username-secret.arn
+  policy = data.aws_iam_policy_document.secret-manager-usernamesecret-resource-policy.json
+}
+
+resource "aws_secretsmanager_secret_policy" "passwordsecretpolicy" {
+  secret_arn = aws_secretsmanager_secret.rds-login-password-secret.arn
+  policy = data.aws_iam_policy_document.secret-manager-passwordsecret-resource-policy.json
+}
+
+resource "aws_secretsmanager_secret_policy" "endpointsecretpolicy" {
+  secret_arn = aws_secretsmanager_secret.rds-login-endpint-secret.arn
+  policy = data.aws_iam_policy_document.secret-manager-endpointsecret-resource-policy.json
+}
+
+resource "aws_secretsmanager_secret_policy" "mailtopicsecretpolicy" {
+  secret_arn = aws_secretsmanager_secret.sns-topic-arn.arn
+  policy = data.aws_iam_policy_document.secret-manager-mailuploadtopic-resource-policy.json
+}
 
 #=====================================================================
 # AWS SNS Notification
@@ -345,6 +365,10 @@ resource "aws_sns_topic_subscription" "mail-upload-subscription" {
   endpoint = "skoushicksuri@gmail.com"
   protocol = "email"
 }
+
+#=====================================================================
+# AWS Route53 record
+# DNS A record to connect to EC2 Public IP
 
 resource "aws_route53_record" "file-upload-route53-alias" {
   zone_id = data.aws_route53_zone.my-file-upload-route53-zone.zone_id
