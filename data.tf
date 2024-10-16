@@ -31,6 +31,8 @@ data "aws_iam_policy_document" "assume-role-policy" {
   }
 }
 
+# File upload service policy to be used in EC2 instance profile which will run the file upload app
+# This is an identity based policy
 data "aws_iam_policy_document" "file-upload-service-policy" {
   statement {
     actions = ["dynamodb:PutItem","dynamodb:GetItem","secretsmanager:GetSecretValue","s3:PutObject","s3:GetObject","s3:ListBucket","sns:Publish"]
@@ -44,8 +46,41 @@ data "aws_iam_policy_document" "file-upload-service-policy" {
   }
 }
 
-# DynamoDB resource policy 
+# AWS SNS resource policy
+data "aws_iam_policy_document" "sns-resource-policy" {
+  statement {
+    actions = ["sns:Publish"]
+    effect = "Allow"
 
+    principals {
+      type = "AWS"
+      identifiers = [aws_iam_role.file-upload-role.arn]
+    }
+    resources = [aws_sns_topic.mail-upload-topic.arn]
+    sid = "stmt-1"
+  }
+
+  statement {
+    actions = ["sns:Publish"]
+    effect = "Deny"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    resources = [aws_sns_topic.mail-upload-topic.arn]
+    sid = "stmt-2"
+    # Since Deny takes precedence , below condition is required to ensure above principal is excluded
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = [aws_iam_role.file-upload-role.arn]
+    }
+  }
+}
+
+# DynamoDB resource policy 
 data "aws_iam_policy_document" "dynamodb-resource-policy" {
   statement {
     actions = ["dynamodb:PutItem","dynamodb:GetItem"]
@@ -109,10 +144,17 @@ data "aws_iam_policy_document" "secret-manager-usernamesecret-resource-policy" {
       
     resources = [aws_secretsmanager_secret.rds-login-username-secret.arn]
     # Since Deny takes precedence , below condition is required to ensure above principal is excluded
+    # Below conditions will be combined using AND operator
     condition {
       test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
       values   = [aws_iam_role.file-upload-role.arn]
+    }
+
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = ["arn:aws:iam::556659523435:user/s3-user"]
     }
   }
 }
@@ -143,10 +185,17 @@ data "aws_iam_policy_document" "secret-manager-passwordsecret-resource-policy" {
       
     resources = [aws_secretsmanager_secret.rds-login-password-secret.arn]
     # Since Deny takes precedence , below condition is required to ensure above principal is excluded
+    # Below conditions will be combined using AND operator
     condition {
       test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
       values   = [aws_iam_role.file-upload-role.arn]
+    }
+
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = ["arn:aws:iam::556659523435:user/s3-user"]
     }
   }
 }
@@ -177,10 +226,17 @@ data "aws_iam_policy_document" "secret-manager-endpointsecret-resource-policy" {
       
     resources = [aws_secretsmanager_secret.rds-login-endpint-secret.arn]
     # Since Deny takes precedence , below condition is required to ensure above principal is excluded
+    # Below conditions will be combined using AND operator
     condition {
       test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
       values   = [aws_iam_role.file-upload-role.arn]
+    }
+
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = ["arn:aws:iam::556659523435:user/s3-user"]
     }
   }
 }
@@ -211,10 +267,17 @@ data "aws_iam_policy_document" "secret-manager-mailuploadtopic-resource-policy" 
       
     resources = [aws_secretsmanager_secret.sns-topic-arn.arn]
     # Since Deny takes precedence , below condition is required to ensure above principal is excluded
+    # Below conditions will be combined using AND operator
     condition {
       test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
       values   = [aws_iam_role.file-upload-role.arn]
+    }
+
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = ["arn:aws:iam::556659523435:user/s3-user"]
     }
   }
 }

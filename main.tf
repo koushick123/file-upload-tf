@@ -76,7 +76,7 @@ resource "aws_internet_gateway" "file-upload-application-igw" {
   }
 }
 
-#=====================================================================
+#==========================================================================================================================================
 
 # AWS EC2
 # Create EC2
@@ -111,7 +111,7 @@ resource "aws_iam_instance_profile" "file-upload-profile" {
   role = "${aws_iam_role.file-upload-role.name}"
 }
 
-#=====================================================================
+#==========================================================================================================================================
 # AWS RDS
 # Create a database VPC
 resource "aws_vpc" "file-upload-db-vpc" {
@@ -215,7 +215,7 @@ resource "aws_db_instance" "file-upload-rds" {
   db_subnet_group_name = aws_db_subnet_group.db_subnets.name  
 }
 
-#=====================================================================
+#==========================================================================================================================================
 # AWS S3
 # Create an S3 bucket
 resource "aws_s3_bucket" "media-bucket-2024" {
@@ -232,7 +232,7 @@ resource "aws_s3_bucket_public_access_block" "my_bucket_public_access_block" {
   restrict_public_buckets  = false  # Allow public bucket
 }
 
-#=====================================================================
+#==========================================================================================================================================
 # AWS Dynamo DB
 # Create a DynamoDB table
 resource "aws_dynamodb_table" "upload-table" {
@@ -254,7 +254,7 @@ resource "aws_dynamodb_resource_policy" "upload-table-policy" {
   confirm_remove_self_resource_access = false
 }
 
-#=====================================================================
+#==========================================================================================================================================
 # IAM Access Policy
 # Create IAM Policy role with specific access to resources (AWS RDS, DynamodDB, S3)
  resource "aws_iam_role" "file-upload-role" {
@@ -269,7 +269,7 @@ resource "aws_iam_role_policy" "file_upload_role_policy" {
   policy = data.aws_iam_policy_document.file-upload-service-policy.json
 }
 
-#=====================================================================
+#==========================================================================================================================================
 # VPC Endpoint
 
 # Create VPC Endpoint (Interface)
@@ -288,7 +288,7 @@ resource "aws_vpc_endpoint_policy" "vpce-file-upload-policy" {
   policy = data.aws_iam_policy_document.dynamodb-resource-policy.json
 }
 
-#=====================================================================
+#==========================================================================================================================================
 # AWS Secret Manager
 # Create AWS Secret Manager for RDS Login
 resource "aws_secretsmanager_secret" "rds-login-username-secret" {
@@ -353,7 +353,7 @@ resource "aws_secretsmanager_secret_policy" "mailtopicsecretpolicy" {
   policy = data.aws_iam_policy_document.secret-manager-mailuploadtopic-resource-policy.json
 }
 
-#=====================================================================
+#==========================================================================================================================================
 # AWS SNS Notification
 # Create AWS SNS Topic and Subscription
 resource "aws_sns_topic" "mail-upload-topic" {
@@ -366,7 +366,13 @@ resource "aws_sns_topic_subscription" "mail-upload-subscription" {
   protocol = "email"
 }
 
-#=====================================================================
+# SNS resource based policy
+resource "aws_sns_topic_policy" "mail-upload-policy" {
+  arn = data.aws_sns_topic.email-upload-topic.arn
+  policy = data.aws_iam_policy_document.sns-resource-policy.json
+}
+
+#==========================================================================================================================================
 # AWS Route53 record
 # DNS A record to connect to EC2 Public IP
 
