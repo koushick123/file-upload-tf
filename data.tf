@@ -42,7 +42,8 @@ data "aws_iam_policy_document" "file-upload-service-policy" {
     aws_secretsmanager_secret.rds-login-endpint-secret.arn,
     aws_secretsmanager_secret.rds-login-username-secret.arn, 
     aws_secretsmanager_secret.rds-login-password-secret.arn,
-    aws_secretsmanager_secret.sns-topic-arn.arn]
+    aws_secretsmanager_secret.sns-topic-arn.arn,
+    aws_secretsmanager_secret.dynamodb-vpce.arn]
   }
 }
 
@@ -61,7 +62,7 @@ data "aws_iam_policy_document" "sns-resource-policy" {
   }
 
   statement {
-    actions = ["sns:Publish"]
+    actions = ["sns:Publish","sns:Subscribe","sns:DeleteTopic"]
     effect = "Deny"
 
     principals {
@@ -134,7 +135,7 @@ data "aws_iam_policy_document" "secret-manager-usernamesecret-resource-policy" {
   }
 
   statement {
-    actions = ["secretsmanager:GetSecretValue"]
+    actions = ["secretsmanager:GetSecretValue","secretsmanager:PutSecretValue"]
     effect = "Deny"
 
     principals {
@@ -175,7 +176,7 @@ data "aws_iam_policy_document" "secret-manager-passwordsecret-resource-policy" {
   }
 
   statement {
-    actions = ["secretsmanager:GetSecretValue"]
+    actions = ["secretsmanager:GetSecretValue","secretsmanager:PutSecretValue"]
     effect = "Deny"
 
     principals {
@@ -216,7 +217,7 @@ data "aws_iam_policy_document" "secret-manager-endpointsecret-resource-policy" {
   }
 
   statement {
-    actions = ["secretsmanager:GetSecretValue"]
+    actions = ["secretsmanager:GetSecretValue","secretsmanager:PutSecretValue"]
     effect = "Deny"
 
     principals {
@@ -257,7 +258,7 @@ data "aws_iam_policy_document" "secret-manager-mailuploadtopic-resource-policy" 
   }
 
   statement {
-    actions = ["secretsmanager:GetSecretValue"]
+    actions = ["secretsmanager:GetSecretValue","secretsmanager:PutSecretValue"]
     effect = "Deny"
 
     principals {
@@ -266,6 +267,47 @@ data "aws_iam_policy_document" "secret-manager-mailuploadtopic-resource-policy" 
     }
       
     resources = [aws_secretsmanager_secret.sns-topic-arn.arn]
+    # Since Deny takes precedence , below condition is required to ensure above principal is excluded
+    # Below conditions will be combined using AND operator
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = [aws_iam_role.file-upload-role.arn]
+    }
+
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = ["arn:aws:iam::556659523435:user/s3-user"]
+    }
+  }
+}
+
+# AWS Secret dynamodbvpcsecret resource policy
+
+data "aws_iam_policy_document" "secret-manager-dynamodbvpce-resource-policy" {
+  statement {
+    actions = ["secretsmanager:GetSecretValue"]
+    effect = "Allow"
+
+    principals {
+      type = "AWS"
+      identifiers = [aws_iam_role.file-upload-role.arn]
+    }
+
+    resources = [aws_secretsmanager_secret.sns-topic-arn.arn]
+  }
+
+  statement {
+    actions = ["secretsmanager:GetSecretValue","secretsmanager:PutSecretValue"]
+    effect = "Deny"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+      
+    resources = [aws_secretsmanager_secret.dynamodb-vpce.arn]
     # Since Deny takes precedence , below condition is required to ensure above principal is excluded
     # Below conditions will be combined using AND operator
     condition {

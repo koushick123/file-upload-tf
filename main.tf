@@ -271,7 +271,6 @@ resource "aws_iam_role_policy" "file_upload_role_policy" {
 
 #==========================================================================================================================================
 # VPC Endpoint
-
 # Create VPC Endpoint (Interface)
 resource "aws_vpc_endpoint" "file-upload-endpoint" {
   service_name = "com.amazonaws.ap-south-1.dynamodb"
@@ -279,7 +278,34 @@ resource "aws_vpc_endpoint" "file-upload-endpoint" {
   vpc_id = aws_vpc.file-upload-application-vpc.id
   subnet_ids = [aws_subnet.file-upload-application-subnet-az-1a.id]
   vpc_endpoint_type = "Interface"
+  security_group_ids = [aws_security_group.dynamodb-vpce-sg-application-vpc.id]
   #depends_on = [ aws_dynamodb_table.upload-table ]
+}
+
+# Create Security Group for VPC Endpoint to allow inbound traffic
+resource "aws_security_group" "dynamodb-vpce-sg-application-vpc" {
+  vpc_id = aws_vpc.file-upload-application-vpc.id
+  tags = {
+    Name = "DynamoDB-VPC-Endpoint-SG"
+  }
+}
+
+# Create Ingress rules
+resource "aws_vpc_security_group_ingress_rule" "dynamodb-vpce-sg-ingress-https" {
+  security_group_id = aws_security_group.dynamodb-vpce-sg-application-vpc.id
+  ip_protocol = "tcp"
+  from_port = 443
+  to_port = 443
+  referenced_security_group_id = aws_default_security_group.default-sg-application.id
+}
+
+# Create egress rule
+resource "aws_vpc_security_group_egress_rule" "dynamodb-vpce-sg-egress-all" {
+  security_group_id = aws_security_group.dynamodb-vpce-sg-application-vpc.id
+  ip_protocol = "All"
+  from_port = -1
+  to_port = -1
+  referenced_security_group_id = aws_default_security_group.default-sg-application.id
 }
 
 # VPC Endpoint policy
@@ -306,8 +332,15 @@ resource "aws_secretsmanager_secret" "rds-login-endpint-secret" {
   recovery_window_in_days = 0  
 }
 
+# Create AWS Secret Manager for SNS Topic
 resource "aws_secretsmanager_secret" "sns-topic-arn" {
   name = "fileuploadtopicarnsecret"
+  recovery_window_in_days = 0
+}
+
+# Create AWS Secret Manager for DynamoDB Endpoint
+resource "aws_secretsmanager_secret" "dynamodb-vpce" {
+  name = "dynamodbvpcesecret"
   recovery_window_in_days = 0
 }
 
@@ -327,9 +360,16 @@ resource "aws_secretsmanager_secret_version" "rds-login-endpoint" {
   secret_string = "jdbc:mysql://${data.aws_db_instance.file-upload-rds.endpoint}/${data.aws_db_instance.file-upload-rds.db_name}"
 }
 
+# Create AWS Secret values for SNS Topic
 resource "aws_secretsmanager_secret_version" "sns-file-upload-topic-arn" {
   secret_id = aws_secretsmanager_secret.sns-topic-arn.id
   secret_string = aws_sns_topic.mail-upload-topic.arn
+}
+
+# Create AWS Secret values for Dynamo DB VPC Endpoint
+resource "aws_secretsmanager_secret_version" "dynamodb-vpce" {
+  secret_id = aws_secretsmanager_secret.dynamodb-vpce.id
+  secret_string = aws_vpc_endpoint.file-upload-endpoint.dns_entry[0]["dns_name"]
 }
 
 # Create AWS Secret Manager resource based policies for all its secrets
@@ -351,6 +391,11 @@ resource "aws_secretsmanager_secret_policy" "endpointsecretpolicy" {
 resource "aws_secretsmanager_secret_policy" "mailtopicsecretpolicy" {
   secret_arn = aws_secretsmanager_secret.sns-topic-arn.arn
   policy = data.aws_iam_policy_document.secret-manager-mailuploadtopic-resource-policy.json
+}
+
+resource "aws_secretsmanager_secret_policy" "dynamodbvpesecretpolicy" {
+  secret_arn = aws_secretsmanager_secret.dynamodb-vpce.arn
+  policy = data.aws_iam_policy_document.secret-manager-dynamodbvpce-resource-policy.json
 }
 
 #==========================================================================================================================================
