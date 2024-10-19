@@ -11,7 +11,11 @@ output "dynamo-db-name" {
 }
 
 output "dynamod-db-vpc-endpoint-dns" {
-  value = aws_vpc_endpoint.file-upload-endpoint.dns_entry
+  value = aws_vpc_endpoint.dynamodb-vpc-endpoint.dns_entry
+}
+
+output "s3-vpc-endpoint-dns" {
+  value = aws_vpc_endpoint.s3-vpc-endpoint.dns_entry
 }
 
 output "ec2_private_key" {

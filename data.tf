@@ -16,7 +16,13 @@ data "aws_sns_topic" "email-upload-topic" {
 data "aws_vpc_endpoint" "vpc_endpoint_dynamodb_interface" {
   vpc_id = aws_vpc.file-upload-application-vpc.id
   service_name = "com.amazonaws.ap-south-1.dynamodb"
-  depends_on = [ aws_vpc_endpoint.file-upload-endpoint ]
+  depends_on = [ aws_vpc_endpoint.dynamodb-vpc-endpoint]
+}
+
+data "aws_vpc_endpoint" "vpc_endpoint_s3_interface" {
+  vpc_id = aws_vpc.file-upload-application-vpc.id
+  service_name = "com.amazonaws.ap-south-1.s3"
+  depends_on = [ aws_vpc_endpoint.s3-vpc-endpoint]
 }
 
 data "aws_iam_policy_document" "assume-role-policy" {
@@ -115,6 +121,47 @@ data "aws_iam_policy_document" "dynamodb-resource-policy" {
       test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
       values   = [aws_iam_role.file-upload-role.arn]
+    }
+  }
+}
+
+#AWS S3 bucket resource policy
+
+data "aws_iam_policy_document" "s3-bucket-resource-policy" {
+  statement {
+    actions = ["s3:PutObject","s3:GetObject","s3:ListBucket"]
+    effect = "Allow"
+
+    principals {
+      type = "AWS"
+      identifiers = [aws_iam_role.file-upload-role.arn]
+    }
+
+    resources = [aws_s3_bucket.media-bucket-2024.arn, "${aws_s3_bucket.media-bucket-2024.arn}/*"]
+  }
+
+  statement {
+    actions = ["s3:PutObject","s3:GetObject","s3:ListBucket"]
+    effect = "Deny"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+      
+    resources = [aws_s3_bucket.media-bucket-2024.arn, "${aws_s3_bucket.media-bucket-2024.arn}/*"]
+    # Since Deny takes precedence , below condition is required to ensure above principal is excluded
+    # Below conditions will be combined using AND operator
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = [aws_iam_role.file-upload-role.arn]
+    }
+
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = ["arn:aws:iam::556659523435:user/s3-user"]
     }
   }
 }
@@ -308,6 +355,47 @@ data "aws_iam_policy_document" "secret-manager-dynamodbvpce-resource-policy" {
     }
       
     resources = [aws_secretsmanager_secret.dynamodb-vpce.arn]
+    # Since Deny takes precedence , below condition is required to ensure above principal is excluded
+    # Below conditions will be combined using AND operator
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = [aws_iam_role.file-upload-role.arn]
+    }
+
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = ["arn:aws:iam::556659523435:user/s3-user"]
+    }
+  }
+}
+
+# AWS Secret s3bucketvpcesecret resource policy
+
+data "aws_iam_policy_document" "secret-manager-s3vpce-resource-policy" {
+  statement {
+    actions = ["secretsmanager:GetSecretValue"]
+    effect = "Allow"
+
+    principals {
+      type = "AWS"
+      identifiers = [aws_iam_role.file-upload-role.arn]
+    }
+
+    resources = [aws_secretsmanager_secret.s3-vpce.arn]
+  }
+
+  statement {
+    actions = ["secretsmanager:GetSecretValue","secretsmanager:PutSecretValue"]
+    effect = "Deny"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+      
+    resources = [aws_secretsmanager_secret.s3-vpce.arn]
     # Since Deny takes precedence , below condition is required to ensure above principal is excluded
     # Below conditions will be combined using AND operator
     condition {

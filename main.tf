@@ -226,10 +226,16 @@ resource "aws_s3_bucket" "media-bucket-2024" {
 resource "aws_s3_bucket_public_access_block" "my_bucket_public_access_block" {
   bucket = aws_s3_bucket.media-bucket-2024.id
 
-  block_public_acls       = false  # Disable BlockPublicAcls
-  ignore_public_acls       = false  # Allow ACLs
-  block_public_policy      = false  # Disable BlockPublicPolicy
-  restrict_public_buckets  = false  # Allow public bucket
+  block_public_acls       = true  # Disable BlockPublicAcls
+  ignore_public_acls       = true  # Allow ACLs
+  block_public_policy      = true  # Disable BlockPublicPolicy
+  restrict_public_buckets  = true  # Allow public bucket
+}
+
+# Create resource based policy
+resource "aws_s3_bucket_policy" "media-bucket-resource-policy" {
+  bucket = aws_s3_bucket.media-bucket-2024.id
+  policy = data.aws_iam_policy_document.s3-bucket-resource-policy.json
 }
 
 #==========================================================================================================================================
@@ -272,46 +278,36 @@ resource "aws_iam_role_policy" "file_upload_role_policy" {
 #==========================================================================================================================================
 # VPC Endpoint
 # Create VPC Endpoint (Interface)
-resource "aws_vpc_endpoint" "file-upload-endpoint" {
+resource "aws_vpc_endpoint" "dynamodb-vpc-endpoint" {
   service_name = "com.amazonaws.ap-south-1.dynamodb"
   auto_accept = true
   vpc_id = aws_vpc.file-upload-application-vpc.id
   subnet_ids = [aws_subnet.file-upload-application-subnet-az-1a.id]
   vpc_endpoint_type = "Interface"
-  security_group_ids = [aws_security_group.dynamodb-vpce-sg-application-vpc.id]
+  security_group_ids = [aws_security_group.vpce-sg-application-vpc.id]
   #depends_on = [ aws_dynamodb_table.upload-table ]
 }
 
-# Create Security Group for VPC Endpoint to allow inbound traffic
-resource "aws_security_group" "dynamodb-vpce-sg-application-vpc" {
+# VPC Endpoint policy
+resource "aws_vpc_endpoint_policy" "dynamodb-vpc-endpoint-policy" {
+  vpc_endpoint_id = aws_vpc_endpoint.dynamodb-vpc-endpoint.id
+  policy = data.aws_iam_policy_document.dynamodb-resource-policy.json
+}
+
+# VPC Endpoint for AWS S3
+resource "aws_vpc_endpoint" "s3-vpc-endpoint" {
+  service_name = "com.amazonaws.ap-south-1.s3"
+  auto_accept = true
   vpc_id = aws_vpc.file-upload-application-vpc.id
-  tags = {
-    Name = "DynamoDB-VPC-Endpoint-SG"
-  }
-}
-
-# Create Ingress rules
-resource "aws_vpc_security_group_ingress_rule" "dynamodb-vpce-sg-ingress-https" {
-  security_group_id = aws_security_group.dynamodb-vpce-sg-application-vpc.id
-  ip_protocol = "tcp"
-  from_port = 443
-  to_port = 443
-  referenced_security_group_id = aws_default_security_group.default-sg-application.id
-}
-
-# Create egress rule
-resource "aws_vpc_security_group_egress_rule" "dynamodb-vpce-sg-egress-all" {
-  security_group_id = aws_security_group.dynamodb-vpce-sg-application-vpc.id
-  ip_protocol = "All"
-  from_port = -1
-  to_port = -1
-  referenced_security_group_id = aws_default_security_group.default-sg-application.id
+  subnet_ids = [aws_subnet.file-upload-application-subnet-az-1a.id]
+  vpc_endpoint_type = "Interface"
+  security_group_ids = [aws_security_group.vpce-sg-application-vpc.id]
 }
 
 # VPC Endpoint policy
-resource "aws_vpc_endpoint_policy" "vpce-file-upload-policy" {
-  vpc_endpoint_id = aws_vpc_endpoint.file-upload-endpoint.id
-  policy = data.aws_iam_policy_document.dynamodb-resource-policy.json
+resource "aws_vpc_endpoint_policy" "s3-vpc-endpoint-policy" {
+  vpc_endpoint_id = aws_vpc_endpoint.s3-vpc-endpoint.id
+  policy = data.aws_iam_policy_document.s3-bucket-resource-policy.json
 }
 
 #==========================================================================================================================================
@@ -344,6 +340,12 @@ resource "aws_secretsmanager_secret" "dynamodb-vpce" {
   recovery_window_in_days = 0
 }
 
+# Create AWS Secret Manager for DynamoDB Endpoint
+resource "aws_secretsmanager_secret" "s3-vpce" {
+  name = "s3bucketvpcesecret"
+  recovery_window_in_days = 0
+}
+
 # Create AWS Secret values for RDS Login
 resource "aws_secretsmanager_secret_version" "rds-login-username" {
   secret_id     = aws_secretsmanager_secret.rds-login-username-secret.id
@@ -369,7 +371,13 @@ resource "aws_secretsmanager_secret_version" "sns-file-upload-topic-arn" {
 # Create AWS Secret values for Dynamo DB VPC Endpoint
 resource "aws_secretsmanager_secret_version" "dynamodb-vpce" {
   secret_id = aws_secretsmanager_secret.dynamodb-vpce.id
-  secret_string = aws_vpc_endpoint.file-upload-endpoint.dns_entry[0]["dns_name"]
+  secret_string = aws_vpc_endpoint.dynamodb-vpc-endpoint.dns_entry[0]["dns_name"]
+}
+
+# Create AWS Secret values for AWS S3 VPC Endpoint
+resource "aws_secretsmanager_secret_version" "s3-vpce" {
+  secret_id = aws_secretsmanager_secret.s3-vpce.id
+  secret_string = aws_vpc_endpoint.s3-vpc-endpoint.dns_entry[0]["dns_name"]
 }
 
 # Create AWS Secret Manager resource based policies for all its secrets
@@ -396,6 +404,11 @@ resource "aws_secretsmanager_secret_policy" "mailtopicsecretpolicy" {
 resource "aws_secretsmanager_secret_policy" "dynamodbvpesecretpolicy" {
   secret_arn = aws_secretsmanager_secret.dynamodb-vpce.arn
   policy = data.aws_iam_policy_document.secret-manager-dynamodbvpce-resource-policy.json
+}
+
+resource "aws_secretsmanager_secret_policy" "s3vpesecretpolicy" {
+  secret_arn = aws_secretsmanager_secret.s3-vpce.arn
+  policy = data.aws_iam_policy_document.secret-manager-s3vpce-resource-policy.json
 }
 
 #==========================================================================================================================================
@@ -427,4 +440,32 @@ resource "aws_route53_record" "file-upload-route53-alias" {
   type = "A"
   ttl = "300"
   records = [aws_instance.file-upload-instance.public_ip]
+}
+
+#==========================================================================================================================================
+# Security Group for AWS VPC Endpoint
+# Create Security Group for VPC Endpoint to allow inbound traffic
+resource "aws_security_group" "vpce-sg-application-vpc" {
+  vpc_id = aws_vpc.file-upload-application-vpc.id
+  tags = {
+    Name = "VPC-Endpoint-SG"
+  }
+}
+
+# Create Ingress rules
+resource "aws_vpc_security_group_ingress_rule" "vpce-sg-ingress-https" {
+  security_group_id = aws_security_group.vpce-sg-application-vpc.id
+  ip_protocol = "tcp"
+  from_port = 443
+  to_port = 443
+  referenced_security_group_id = aws_default_security_group.default-sg-application.id
+}
+
+# Create Egress rule
+resource "aws_vpc_security_group_egress_rule" "vpce-sg-egress-all" {
+  security_group_id = aws_security_group.vpce-sg-application-vpc.id
+  ip_protocol = "All"
+  from_port = -1
+  to_port = -1
+  referenced_security_group_id = aws_default_security_group.default-sg-application.id
 }
