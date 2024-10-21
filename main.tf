@@ -301,6 +301,10 @@ resource "aws_vpc_endpoint" "s3-vpc-endpoint" {
   vpc_id = aws_vpc.file-upload-application-vpc.id
   subnet_ids = [aws_subnet.file-upload-application-subnet-az-1a.id]
   vpc_endpoint_type = "Interface"
+  private_dns_enabled = true
+  dns_options {
+    private_dns_only_for_inbound_resolver_endpoint = false
+  }
   security_group_ids = [aws_security_group.vpce-sg-application-vpc.id]
 }
 
@@ -377,7 +381,7 @@ resource "aws_secretsmanager_secret_version" "dynamodb-vpce" {
 # Create AWS Secret values for AWS S3 VPC Endpoint
 resource "aws_secretsmanager_secret_version" "s3-vpce" {
   secret_id = aws_secretsmanager_secret.s3-vpce.id
-  secret_string = aws_vpc_endpoint.s3-vpc-endpoint.dns_entry[0]["dns_name"]
+  secret_string = aws_vpc_endpoint.s3-vpc-endpoint.dns_entry[2]["dns_name"]
 }
 
 # Create AWS Secret Manager resource based policies for all its secrets
