@@ -18,6 +18,10 @@ output "s3-vpc-endpoint-dns" {
   value = aws_vpc_endpoint.s3-vpc-endpoint.dns_entry
 }
 
+output "secret-manager-endpoint-dns" {
+  value = aws_vpc_endpoint.secret-manager-vpc-endpoint.dns_entry
+}
+
 output "ec2_private_key" {
   value = tls_private_key.file-upload-private-key.private_key_pem
   sensitive = true

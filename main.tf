@@ -294,7 +294,7 @@ resource "aws_vpc_endpoint_policy" "dynamodb-vpc-endpoint-policy" {
   policy = data.aws_iam_policy_document.dynamodb-resource-policy.json
 }
 
-# VPC Endpoint for AWS S3
+# VPC Endpoint (Interface) for AWS S3
 resource "aws_vpc_endpoint" "s3-vpc-endpoint" {
   service_name = "com.amazonaws.ap-south-1.s3"
   auto_accept = true
@@ -313,6 +313,22 @@ resource "aws_vpc_endpoint_policy" "s3-vpc-endpoint-policy" {
   vpc_endpoint_id = aws_vpc_endpoint.s3-vpc-endpoint.id
   policy = data.aws_iam_policy_document.s3-bucket-resource-policy.json
 }
+
+# VPC Endpoint (Interface) for AWS Secretmanager
+resource "aws_vpc_endpoint" "secret-manager-vpc-endpoint" {
+  service_name = "com.amazonaws.ap-south-1.secretsmanager"
+  auto_accept = true
+  vpc_id = aws_vpc.file-upload-application-vpc.id
+  subnet_ids = [aws_subnet.file-upload-application-subnet-az-1a.id]
+  vpc_endpoint_type = "Interface"
+  security_group_ids = [aws_security_group.vpce-sg-application-vpc.id]
+}
+
+# VPC Endpoint policy
+# resource "aws_vpc_endpoint_policy" "secret-manager-vpc-endpoint-policy" {
+#   vpc_endpoint_id = aws_vpc_endpoint.secret-manager-vpc-endpoint.id
+#   policy = data.aws_iam_policy_document.secr
+# }
 
 #==========================================================================================================================================
 # AWS Secret Manager
@@ -344,7 +360,7 @@ resource "aws_secretsmanager_secret" "dynamodb-vpce" {
   recovery_window_in_days = 0
 }
 
-# Create AWS Secret Manager for DynamoDB Endpoint
+# Create AWS Secret Manager for S3 Endpoint
 resource "aws_secretsmanager_secret" "s3-vpce" {
   name = "s3bucketvpcesecret"
   recovery_window_in_days = 0

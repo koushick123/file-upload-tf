@@ -84,6 +84,11 @@ data "aws_iam_policy_document" "sns-resource-policy" {
       variable = "aws:PrincipalArn"
       values   = [aws_iam_role.file-upload-role.arn]
     }
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = ["arn:aws:iam::556659523435:user/s3-user"]
+    }
   }
 }
 
@@ -411,6 +416,46 @@ data "aws_iam_policy_document" "secret-manager-s3vpce-resource-policy" {
     }
   }
 }
+
+# AWS Secret manager resource policy (For All Secrets)
+# data "aws_iam_policy_document" "secret-manager-all-resource-policy" {
+#   statement {
+#     actions = ["secretsmanager:GetSecretValue"]
+#     effect = "Allow"
+
+#     principals {
+#       type = "AWS"
+#       identifiers = [aws_iam_role.file-upload-role.arn]
+#     }
+
+#     resources = [aws_secretsmanager_secret]
+#   }
+
+#   statement {
+#     actions = ["secretsmanager:GetSecretValue","secretsmanager:PutSecretValue"]
+#     effect = "Deny"
+
+#     principals {
+#       type        = "*"
+#       identifiers = ["*"]
+#     }
+      
+#     resources = [aws_secretsmanager_secret.s3-vpce.arn]
+#     # Since Deny takes precedence , below condition is required to ensure above principal is excluded
+#     # Below conditions will be combined using AND operator
+#     condition {
+#       test     = "ArnNotEquals"
+#       variable = "aws:PrincipalArn"
+#       values   = [aws_iam_role.file-upload-role.arn]
+#     }
+
+#     condition {
+#       test     = "ArnNotEquals"
+#       variable = "aws:PrincipalArn"
+#       values   = ["arn:aws:iam::556659523435:user/s3-user"]
+#     }
+#   }
+# }
 
 data "aws_route53_zone" "my-file-upload-route53-zone" {
   name         = "my-file-upload.com"
