@@ -321,14 +321,18 @@ resource "aws_vpc_endpoint" "secret-manager-vpc-endpoint" {
   vpc_id = aws_vpc.file-upload-application-vpc.id
   subnet_ids = [aws_subnet.file-upload-application-subnet-az-1a.id]
   vpc_endpoint_type = "Interface"
+  private_dns_enabled = true
+  dns_options {
+    private_dns_only_for_inbound_resolver_endpoint = false
+  }
   security_group_ids = [aws_security_group.vpce-sg-application-vpc.id]
 }
 
 # VPC Endpoint policy
-# resource "aws_vpc_endpoint_policy" "secret-manager-vpc-endpoint-policy" {
-#   vpc_endpoint_id = aws_vpc_endpoint.secret-manager-vpc-endpoint.id
-#   policy = data.aws_iam_policy_document.secr
-# }
+resource "aws_vpc_endpoint_policy" "secret-manager-vpc-endpoint-policy" {
+  vpc_endpoint_id = aws_vpc_endpoint.secret-manager-vpc-endpoint.id
+  policy = data.aws_iam_policy_document.secret-manager-vpc-endpoint-policy.json
+}
 
 #==========================================================================================================================================
 # AWS Secret Manager
