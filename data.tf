@@ -89,6 +89,11 @@ data "aws_iam_policy_document" "sns-resource-policy" {
       variable = "aws:PrincipalArn"
       values   = ["arn:aws:iam::556659523435:user/s3-user"]
     }
+    condition {
+      test = "StringNotEquals"
+      variable = "aws:SourceVpce"
+      values = [aws_vpc_endpoint.sns-vpc-endpoint.id]
+    }
   }
 }
 
@@ -127,6 +132,11 @@ data "aws_iam_policy_document" "dynamodb-resource-policy" {
       test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
       values   = [aws_iam_role.file-upload-role.arn]
+    }
+    condition {
+      test = "StringNotEquals"
+      variable = "aws:SourceVpce"
+      values = [data.aws_vpc_endpoint.vpc_endpoint_dynamodb_interface.id]
     }
     condition {
       test = "StringNotEquals"
