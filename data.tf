@@ -36,7 +36,7 @@ data "aws_iam_policy_document" "assume-role-policy" {
     }
   }
 }
-
+#==========================================================================================================================================
 # File upload service policy to be used in EC2 instance profile which will run the file upload app
 # This is an identity based policy
 data "aws_iam_policy_document" "file-upload-service-policy" {
@@ -53,6 +53,8 @@ data "aws_iam_policy_document" "file-upload-service-policy" {
   }
 }
 
+#==========================================================================================================================================
+# Resource Based Policies
 # AWS SNS resource policy
 data "aws_iam_policy_document" "sns-resource-policy" {
   statement {
@@ -127,7 +129,7 @@ data "aws_iam_policy_document" "dynamodb-resource-policy" {
 
     resources = [aws_dynamodb_table.upload-table.arn]
     # Since Deny takes precedence , below condition is required to ensure above principal is excluded
-    # Below conditions are combined using AND operator
+    # Below conditions are combined using AND operator for different variables.
     condition {
       test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
@@ -172,7 +174,7 @@ data "aws_iam_policy_document" "s3-bucket-resource-policy" {
       
     resources = [aws_s3_bucket.media-bucket-2024.arn, "${aws_s3_bucket.media-bucket-2024.arn}/*"]
     # Since Deny takes precedence , below condition is required to ensure above principal is excluded
-    # Below conditions will be combined using AND operator
+    # Below conditions will be combined using AND operator for different variables.
     condition {
       test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
@@ -193,6 +195,8 @@ data "aws_iam_policy_document" "s3-bucket-resource-policy" {
   }
 }
 
+#==========================================================================================================================================
+# VPC Endpoint policies
 # AWS Secret Manager VPC Endpoint policy
 data "aws_iam_policy_document" "secret-manager-vpc-endpoint-policy" {
   statement {
@@ -220,7 +224,53 @@ data "aws_iam_policy_document" "secret-manager-vpc-endpoint-policy" {
     resources = [aws_secretsmanager_secret.dynamodb-vpce.arn, aws_secretsmanager_secret.rds-login-endpint-secret.arn, aws_secretsmanager_secret.rds-login-password-secret.arn,
     aws_secretsmanager_secret.rds-login-username-secret.arn, aws_secretsmanager_secret.s3-vpce.arn, aws_secretsmanager_secret.sns-topic-arn.arn]
     # Since Deny takes precedence , below condition is required to ensure above principal is excluded
-    # Below conditions will be combined using AND operator
+    # Below conditions will be combined using AND operator for different variables.
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = [aws_iam_role.file-upload-role.arn]
+    }
+
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = ["arn:aws:iam::556659523435:user/s3-user"]
+    }
+
+    condition {
+      test = "StringNotEquals"
+      variable = "aws:SourceVpce"
+      values = [aws_vpc_endpoint.secret-manager-vpc-endpoint.id]
+    }
+  }
+}
+
+# AWS Secret manager VPC Endpoint policy
+data "aws_iam_policy_document" "secret-manager-vpce-policy" {
+  statement {
+    actions = ["secretsmanager:GetSecretValue"]
+    effect = "Allow"
+
+    principals {
+      type = "AWS"
+      identifiers = [aws_iam_role.file-upload-role.arn]
+    }
+
+    resources = ["*"]
+  }
+
+  statement {
+    actions = ["secretsmanager:GetSecretValue","secretsmanager:PutSecretValue"]
+    effect = "Deny"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+      
+    resources = ["*"]
+    # Since Deny takes precedence , below condition is required to ensure above principal is excluded
+    # Below conditions will be combined using AND operator for different variables.
     condition {
       test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
@@ -267,7 +317,7 @@ data "aws_iam_policy_document" "secret-manager-usernamesecret-resource-policy" {
       
     resources = [aws_secretsmanager_secret.rds-login-username-secret.arn]
     # Since Deny takes precedence , below condition is required to ensure above principal is excluded
-    # Below conditions will be combined using AND operator
+    # Below conditions will be combined using AND operator for different variables.
     condition {
       test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
@@ -278,6 +328,12 @@ data "aws_iam_policy_document" "secret-manager-usernamesecret-resource-policy" {
       test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
       values   = ["arn:aws:iam::556659523435:user/s3-user"]
+    }
+
+    condition {
+      test = "StringNotEquals"
+      variable = "aws:SourceVpce"
+      values = [aws_vpc_endpoint.secret-manager-vpc-endpoint.id]
     }
   }
 }
@@ -308,7 +364,7 @@ data "aws_iam_policy_document" "secret-manager-passwordsecret-resource-policy" {
       
     resources = [aws_secretsmanager_secret.rds-login-password-secret.arn]
     # Since Deny takes precedence , below condition is required to ensure above principal is excluded
-    # Below conditions will be combined using AND operator
+    # Below conditions will be combined using AND operator for different variables.
     condition {
       test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
@@ -319,6 +375,12 @@ data "aws_iam_policy_document" "secret-manager-passwordsecret-resource-policy" {
       test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
       values   = ["arn:aws:iam::556659523435:user/s3-user"]
+    }
+
+    condition {
+      test = "StringNotEquals"
+      variable = "aws:SourceVpce"
+      values = [aws_vpc_endpoint.secret-manager-vpc-endpoint.id]
     }
   }
 }
@@ -349,7 +411,7 @@ data "aws_iam_policy_document" "secret-manager-endpointsecret-resource-policy" {
       
     resources = [aws_secretsmanager_secret.rds-login-endpint-secret.arn]
     # Since Deny takes precedence , below condition is required to ensure above principal is excluded
-    # Below conditions will be combined using AND operator
+    # Below conditions will be combined using AND operator for different variables.
     condition {
       test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
@@ -360,6 +422,12 @@ data "aws_iam_policy_document" "secret-manager-endpointsecret-resource-policy" {
       test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
       values   = ["arn:aws:iam::556659523435:user/s3-user"]
+    }
+
+    condition {
+      test = "StringNotEquals"
+      variable = "aws:SourceVpce"
+      values = [aws_vpc_endpoint.secret-manager-vpc-endpoint.id]
     }
   }
 }
@@ -390,7 +458,7 @@ data "aws_iam_policy_document" "secret-manager-mailuploadtopic-resource-policy" 
       
     resources = [aws_secretsmanager_secret.sns-topic-arn.arn]
     # Since Deny takes precedence , below condition is required to ensure above principal is excluded
-    # Below conditions will be combined using AND operator
+    # Below conditions will be combined using AND operator for different variables.
     condition {
       test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
@@ -401,6 +469,12 @@ data "aws_iam_policy_document" "secret-manager-mailuploadtopic-resource-policy" 
       test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
       values   = ["arn:aws:iam::556659523435:user/s3-user"]
+    }
+
+    condition {
+      test = "StringNotEquals"
+      variable = "aws:SourceVpce"
+      values = [aws_vpc_endpoint.secret-manager-vpc-endpoint.id]
     }
   }
 }
@@ -431,7 +505,7 @@ data "aws_iam_policy_document" "secret-manager-dynamodbvpce-resource-policy" {
       
     resources = [aws_secretsmanager_secret.dynamodb-vpce.arn]
     # Since Deny takes precedence , below condition is required to ensure above principal is excluded
-    # Below conditions will be combined using AND operator
+    # Below conditions will be combined using AND operator for different variables.
     condition {
       test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
@@ -442,6 +516,12 @@ data "aws_iam_policy_document" "secret-manager-dynamodbvpce-resource-policy" {
       test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
       values   = ["arn:aws:iam::556659523435:user/s3-user"]
+    }
+
+    condition {
+      test = "StringNotEquals"
+      variable = "aws:SourceVpce"
+      values = [aws_vpc_endpoint.secret-manager-vpc-endpoint.id]
     }
   }
 }
@@ -472,7 +552,7 @@ data "aws_iam_policy_document" "secret-manager-s3vpce-resource-policy" {
       
     resources = [aws_secretsmanager_secret.s3-vpce.arn]
     # Since Deny takes precedence , below condition is required to ensure above principal is excluded
-    # Below conditions will be combined using AND operator
+    # Below conditions will be combined using AND operator for different variables.
     condition {
       test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
@@ -483,6 +563,12 @@ data "aws_iam_policy_document" "secret-manager-s3vpce-resource-policy" {
       test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
       values   = ["arn:aws:iam::556659523435:user/s3-user"]
+    }
+
+    condition {
+      test = "StringNotEquals"
+      variable = "aws:SourceVpce"
+      values = [aws_vpc_endpoint.secret-manager-vpc-endpoint.id]
     }
   }
 }

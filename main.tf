@@ -328,6 +328,12 @@ resource "aws_vpc_endpoint" "secret-manager-vpc-endpoint" {
   security_group_ids = [aws_security_group.vpce-sg-application-vpc.id]
 }
 
+# VPC Endpoint policy
+resource "aws_vpc_endpoint_policy" "secret-manager-vpc-endpoint-policy" {
+  vpc_endpoint_id = aws_vpc_endpoint.secret-manager-vpc-endpoint.id
+  policy = data.aws_iam_policy_document.secret-manager-vpce-policy.json
+}
+
 # VPC Endpoint (Interface) for AWS SNS
 resource "aws_vpc_endpoint" "sns-vpc-endpoint" {
   service_name = "com.amazonaws.ap-south-1.sns"
