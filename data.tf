@@ -140,11 +140,6 @@ data "aws_iam_policy_document" "dynamodb-resource-policy" {
       variable = "aws:SourceVpce"
       values = [data.aws_vpc_endpoint.vpc_endpoint_dynamodb_interface.id]
     }
-    condition {
-      test = "StringNotEquals"
-      variable = "aws:SourceVpce"
-      values = [data.aws_vpc_endpoint.vpc_endpoint_dynamodb_interface.id]
-    }
   }
 }
 

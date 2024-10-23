@@ -136,7 +136,8 @@ resource "aws_vpc_security_group_ingress_rule" "default-sg-rds-ingress" {
   ip_protocol = "tcp"
   from_port = 3306
   to_port = 3306
-  cidr_ipv4 = "0.0.0.0/0"
+  # cidr_ipv4 = "0.0.0.0/0"
+  cidr_ipv4 = "${aws_instance.file-upload-instance.private_ip}/32"
 }
 
 resource "aws_vpc_security_group_egress_rule" "default-sg-rds-egress" {
@@ -156,10 +157,10 @@ resource "aws_default_route_table" "file-upload-route-table" {
     gateway_id = "local"
   }
 
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.file-upload-igw.id
-  }
+  # route {
+  #   cidr_block = "0.0.0.0/0"
+  #   gateway_id = aws_internet_gateway.file-upload-igw.id
+  # }
   tags = {
     Name = "File-Upload-DB-RT"
   }
@@ -213,6 +214,17 @@ resource "aws_db_instance" "file-upload-rds" {
   skip_final_snapshot = true
   vpc_security_group_ids = [aws_default_security_group.default-sg-rds.id]
   db_subnet_group_name = aws_db_subnet_group.db_subnets.name  
+}
+
+#==========================================================================================================================================
+# Create a VPC Peering between Application and RDS
+resource "aws_vpc_peering_connection" "application-rds-vpc-peering" {
+  peer_vpc_id = aws_vpc.file-upload-db-vpc.id
+  vpc_id = aws_vpc.file-upload-application-vpc.id
+  auto_accept = true
+  tags = {
+    Name = "Application To DB VPC Peering"
+  }
 }
 
 #==========================================================================================================================================
@@ -285,6 +297,9 @@ resource "aws_vpc_endpoint" "dynamodb-vpc-endpoint" {
   subnet_ids = [aws_subnet.file-upload-application-subnet-az-1a.id]
   vpc_endpoint_type = "Interface"
   security_group_ids = [aws_security_group.vpce-sg-application-vpc.id]
+  tags = {
+    Name = "Dynamo DB VPC Endpoint"
+  }
   #depends_on = [ aws_dynamodb_table.upload-table ]
 }
 
@@ -306,6 +321,9 @@ resource "aws_vpc_endpoint" "s3-vpc-endpoint" {
     private_dns_only_for_inbound_resolver_endpoint = false
   }
   security_group_ids = [aws_security_group.vpce-sg-application-vpc.id]
+  tags = {
+    Name = "S3 VPC Endpoint"
+  }
 }
 
 # VPC Endpoint policy
@@ -326,6 +344,9 @@ resource "aws_vpc_endpoint" "secret-manager-vpc-endpoint" {
     private_dns_only_for_inbound_resolver_endpoint = false
   }
   security_group_ids = [aws_security_group.vpce-sg-application-vpc.id]
+  tags = {
+    Name = "Secret Manager VPC Endpoint"
+  }
 }
 
 # VPC Endpoint policy
@@ -346,6 +367,9 @@ resource "aws_vpc_endpoint" "sns-vpc-endpoint" {
     private_dns_only_for_inbound_resolver_endpoint = false
   }
   security_group_ids = [aws_security_group.vpce-sg-application-vpc.id]
+  tags = {
+    Name = "SNS VPC Endpoint"
+  }
 }
 
 # VPC Endpoint policy
