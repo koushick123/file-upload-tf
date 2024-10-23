@@ -1,5 +1,5 @@
 output "ec2_private_key" {
-  value = tls_private_key.file-upload-private-key.private_key_pem
+  value     = tls_private_key.file-upload-private-key.private_key_pem
   sensitive = true
 }
 
