@@ -54,6 +54,11 @@ resource "aws_default_route_table" "file-upload-application-route-table" {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.file-upload-application-igw.id
   }
+
+  route {
+    cidr_block = aws_vpc.file-upload-db-vpc.cidr_block
+    gateway_id = aws_vpc_peering_connection.application-rds-vpc-peering.id
+  }
   tags = {
     Name = "File-Upload-Application-RT"
   }
@@ -157,6 +162,10 @@ resource "aws_default_route_table" "file-upload-route-table" {
     gateway_id = "local"
   }
 
+  route {
+    cidr_block = aws_vpc.file-upload-application-vpc.cidr_block
+    gateway_id = aws_vpc_peering_connection.application-rds-vpc-peering.id
+  }
   # route {
   #   cidr_block = "0.0.0.0/0"
   #   gateway_id = aws_internet_gateway.file-upload-igw.id
@@ -224,6 +233,12 @@ resource "aws_vpc_peering_connection" "application-rds-vpc-peering" {
   auto_accept = true
   tags = {
     Name = "Application To DB VPC Peering"
+  }
+  accepter {
+    allow_remote_vpc_dns_resolution = true
+  }
+  requester {
+    allow_remote_vpc_dns_resolution = true
   }
 }
 
