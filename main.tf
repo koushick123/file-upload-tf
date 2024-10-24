@@ -97,6 +97,7 @@ resource "aws_instance" "file-upload-instance" {
   associate_public_ip_address = true
   iam_instance_profile        = aws_iam_instance_profile.file-upload-profile.name
   user_data                   = var.ec2_user_data
+  user_data_replace_on_change = true
 }
 
 # TLS Private Key
@@ -142,7 +143,6 @@ resource "aws_vpc_security_group_ingress_rule" "default-sg-rds-ingress" {
   ip_protocol       = "tcp"
   from_port         = 3306
   to_port           = 3306
-  # cidr_ipv4 = "0.0.0.0/0"
   cidr_ipv4 = "${aws_instance.file-upload-instance.private_ip}/32"
 }
 
@@ -167,10 +167,7 @@ resource "aws_default_route_table" "file-upload-route-table" {
     cidr_block = aws_vpc.file-upload-application-vpc.cidr_block
     gateway_id = aws_vpc_peering_connection.application-rds-vpc-peering.id
   }
-  # route {
-  #   cidr_block = "0.0.0.0/0"
-  #   gateway_id = aws_internet_gateway.file-upload-igw.id
-  # }
+
   tags = {
     Name = "File-Upload-DB-RT"
   }
@@ -227,7 +224,7 @@ resource "aws_db_instance" "file-upload-rds" {
 }
 
 #==========================================================================================================================================
-# Create a VPC Peering between Application and RDS
+# Create a VPC Peering between Application and RDS VPCs
 resource "aws_vpc_peering_connection" "application-rds-vpc-peering" {
   peer_vpc_id = aws_vpc.file-upload-db-vpc.id
   vpc_id      = aws_vpc.file-upload-application-vpc.id
@@ -523,7 +520,7 @@ resource "aws_route53_record" "file-upload-route53-alias" {
   name    = "www.${data.aws_route53_zone.my-file-upload-route53-zone.name}"
   type    = "A"
   ttl     = "300"
-  records = [aws_instance.file-upload-instance.public_ip]
+  records = [data.aws_instance.ec2_instance.public_ip]
 }
 
 #==========================================================================================================================================
