@@ -1,7 +1,7 @@
-data "aws_instance" "ec2_instance" {
-  instance_id = aws_instance.file-upload-instance.id
-  get_user_data = true
-}
+# data "aws_instance" "ec2_instance" {
+#   instance_id = aws_instance.file-upload-instance.id
+#   get_user_data = true
+# }
 
 data "aws_vpc" "file-upload-vpc" {
   cidr_block = "10.100.0.0/16"
