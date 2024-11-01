@@ -22,19 +22,43 @@ resource "aws_vpc_security_group_ingress_rule" "default-sg-application-ingress-s
   ip_protocol       = "tcp"
   from_port         = 22
   to_port           = 22
-  cidr_ipv4         = "${aws_instance.file-upload-admin-instance.public_ip}/32"
+  cidr_ipv4         = "${aws_instance.file-upload-admin-instance.private_ip}/32"
 }
 
 resource "aws_vpc_security_group_ingress_rule" "default-sg-application-ingress-http" {
-  security_group_id = aws_default_security_group.default-sg-application.id
-  ip_protocol       = "tcp"
-  from_port         = 80
-  to_port           = 80
+  security_group_id            = aws_default_security_group.default-sg-application.id
+  ip_protocol                  = "tcp"
+  from_port                    = 80
+  to_port                      = 80
   referenced_security_group_id = aws_security_group.file-upload-lb-sg.id
 }
 
 resource "aws_vpc_security_group_egress_rule" "default-sg-application-egress" {
   security_group_id = aws_default_security_group.default-sg-application.id
+  ip_protocol       = "All"
+  from_port         = -1
+  to_port           = -1
+  cidr_ipv4         = "0.0.0.0/0"
+}
+
+# Security Group for Admin
+resource "aws_security_group" "admin-sg" {
+  vpc_id = aws_vpc.file-upload-application-vpc.id
+  tags = {
+    Name = "File-Upload-Admin-SG"
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "admin-sg-ingress-ssh" {
+  security_group_id = aws_security_group.admin-sg.id
+  ip_protocol       = "tcp"
+  from_port         = 22
+  to_port           = 22
+  cidr_ipv4         = "0.0.0.0/0"
+}
+
+resource "aws_vpc_security_group_egress_rule" "admin-sg-egress" {
+  security_group_id = aws_security_group.admin-sg.id
   ip_protocol       = "All"
   from_port         = -1
   to_port           = -1
@@ -64,7 +88,31 @@ resource "aws_default_route_table" "file-upload-application-route-table" {
   }
 }
 
+# Route table for Application - Private Subnet
+resource "aws_route_table" "file-upload-application-route-table-private" {
+  vpc_id = aws_vpc.file-upload-application-vpc.id
+
+  route {
+    cidr_block = aws_vpc.file-upload-application-vpc.cidr_block
+    gateway_id = "local"
+  }
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_nat_gateway.file-upload-public-nat-1a.id
+  }
+
+  route {
+    cidr_block = aws_vpc.file-upload-db-vpc.cidr_block
+    gateway_id = aws_vpc_peering_connection.application-rds-vpc-peering.id
+  }
+  tags = {
+    Name = "File-Upload-Application-RT-Private"
+  }
+}
+
 # Create two subnets (across two AZs) within the Application VPC
+# Public Subnet (Use file-upload-application-route-table default RT)
 resource "aws_subnet" "file-upload-application-subnet-az-1a" {
   vpc_id            = aws_vpc.file-upload-application-vpc.id
   cidr_block        = "10.200.1.0/24"
@@ -74,6 +122,7 @@ resource "aws_subnet" "file-upload-application-subnet-az-1a" {
   }
 }
 
+# Private Subnet
 resource "aws_subnet" "file-upload-application-subnet-az-1b" {
   vpc_id            = aws_vpc.file-upload-application-vpc.id
   cidr_block        = "10.200.2.0/24"
@@ -83,6 +132,26 @@ resource "aws_subnet" "file-upload-application-subnet-az-1b" {
   }
 }
 
+# Private Subnet and Private RT association
+resource "aws_route_table_association" "file-upload-private-subnet-rt" {
+  route_table_id = aws_route_table.file-upload-application-route-table-private.id
+  subnet_id      = aws_subnet.file-upload-application-subnet-az-1b.id
+}
+
+# NAT Gateway for Public subnet (outbound internet access)
+resource "aws_nat_gateway" "file-upload-public-nat-1a" {
+  allocation_id = aws_eip.file-upload-eip-1a.allocation_id
+  subnet_id     = aws_subnet.file-upload-application-subnet-az-1a.id
+}
+
+# AWS EIP (Elastic IP)
+resource "aws_eip" "file-upload-eip-1a" {
+  domain           = "vpc"
+  public_ipv4_pool = "amazon"
+  depends_on       = [aws_internet_gateway.file-upload-application-igw]
+}
+
+# Internet gateway for public subnet (outbound internet access)
 resource "aws_internet_gateway" "file-upload-application-igw" {
   vpc_id = aws_vpc.file-upload-application-vpc.id
   tags = {
@@ -102,7 +171,7 @@ resource "aws_instance" "file-upload-admin-instance" {
   instance_type               = "t2.micro"
   key_name                    = aws_key_pair.file-upload-key-pair.key_name
   subnet_id                   = aws_subnet.file-upload-application-subnet-az-1a.id
-  vpc_security_group_ids      = [aws_default_security_group.default-sg-application.id]
+  vpc_security_group_ids      = [aws_security_group.admin-sg.id]
   associate_public_ip_address = true
   # iam_instance_profile        = aws_iam_instance_profile.file-upload-profile.name
   # user_data                   = var.ec2_user_data
@@ -133,12 +202,12 @@ resource "aws_iam_instance_profile" "file-upload-profile" {
 # AWS Auto Scaling Group
 # Create AWS Auto scaling group
 resource "aws_autoscaling_group" "file-upload-asg" {
-  name = "File-Upload-ASG"
-  max_size = 1
-  min_size = 1
-  desired_capacity = 1
-  vpc_zone_identifier = [aws_subnet.file-upload-application-subnet-az-1a.id]
-  capacity_rebalance = true
+  name                = "File-Upload-ASG"
+  max_size            = 1
+  min_size            = 1
+  desired_capacity    = 1
+  vpc_zone_identifier = [aws_subnet.file-upload-application-subnet-az-1b.id]
+  capacity_rebalance  = true
   launch_template {
     id = aws_launch_template.ec2_launch_template.id
   }
@@ -147,14 +216,14 @@ resource "aws_autoscaling_group" "file-upload-asg" {
 #==========================================================================================================================================
 # AWS Target Group
 resource "aws_lb_target_group" "file-upload-target-group" {
-  name = "file-upload-tg"
-  port = 80
-  protocol = "HTTP"
+  name        = "file-upload-tg"
+  port        = 80
+  protocol    = "HTTP"
   target_type = "instance"
   health_check {
     enabled = true
     matcher = 200
-    path = "/uploadapp/mediaupload/health-check"
+    path    = "/uploadapp/mediaupload/health-check"
   }
   vpc_id = aws_vpc.file-upload-application-vpc.id
 }
@@ -163,30 +232,30 @@ resource "aws_lb_target_group" "file-upload-target-group" {
 # Attach the Auto Scaling Group to the Target Group
 resource "aws_autoscaling_attachment" "file-upload-asg-attachment" {
   autoscaling_group_name = aws_autoscaling_group.file-upload-asg.name
-  lb_target_group_arn = aws_lb_target_group.file-upload-target-group.arn
+  lb_target_group_arn    = aws_lb_target_group.file-upload-target-group.arn
 }
 
 #==========================================================================================================================================
 # AWS Network Load Balancer
 resource "aws_lb" "file-upload-application-LB" {
-  name = "file-upload-lb"
+  name               = "file-upload-lb"
   load_balancer_type = "application"
-  subnets = [aws_subnet.file-upload-application-subnet-az-1a.id, aws_subnet.file-upload-application-subnet-az-1b.id]
-  security_groups = [aws_security_group.file-upload-lb-sg.id]
+  subnets            = [aws_subnet.file-upload-application-subnet-az-1a.id, aws_subnet.file-upload-application-subnet-az-1b.id]
+  security_groups    = [aws_security_group.file-upload-lb-sg.id]
   tags = {
     Name = "File-Upload-Load-Balancer"
-  }  
+  }
 }
 
 # Create a Listener for the ALB on HTTP port 80
 resource "aws_lb_listener" "http_listener" {
- load_balancer_arn = aws_lb.file-upload-application-LB.arn
- port = 80
- protocol = "HTTP"
- default_action {
-   type = "forward"
-   target_group_arn = aws_lb_target_group.file-upload-target-group.arn
- }
+  load_balancer_arn = aws_lb.file-upload-application-LB.arn
+  port              = 80
+  protocol          = "HTTP"
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.file-upload-target-group.arn
+  }
 }
 
 #==========================================================================================================================================
@@ -221,10 +290,10 @@ resource "aws_vpc_security_group_egress_rule" "file-upload-sg-lb-egress" {
 # AWS EC2 Launch Template
 resource "aws_launch_template" "ec2_launch_template" {
   instance_type = "t2.micro"
-  image_id = "ami-0dee22c13ea7a9a67"
+  image_id      = "ami-0dee22c13ea7a9a67"
   tags = {
-      Name = "File Upload Launch Template"
-    }
+    Name = "File Upload Launch Template"
+  }
   iam_instance_profile {
     arn = aws_iam_instance_profile.file-upload-profile.arn
   }
@@ -639,8 +708,8 @@ resource "aws_route53_record" "file-upload-route53-alias" {
   name    = "www.${data.aws_route53_zone.my-file-upload-route53-zone.name}"
   type    = "A"
   alias {
-    name = aws_lb.file-upload-application-LB.dns_name
-    zone_id = aws_lb.file-upload-application-LB.zone_id
+    name                   = aws_lb.file-upload-application-LB.dns_name
+    zone_id                = aws_lb.file-upload-application-LB.zone_id
     evaluate_target_health = true
   }
 }

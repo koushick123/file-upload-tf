@@ -7,7 +7,7 @@ output "aws-lb-dns-name" {
   value = aws_lb.file-upload-application-LB.dns_name
 }
 
-output "ec2_public_ip" {
+output "ec2_admin_public_ip" {
   value = aws_instance.file-upload-admin-instance.public_ip
 }
 
