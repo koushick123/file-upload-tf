@@ -211,6 +211,7 @@ resource "aws_autoscaling_group" "file-upload-asg" {
   launch_template {
     id = aws_launch_template.ec2_launch_template.id
   }
+  depends_on = [ aws_route_table_association.file-upload-private-subnet-rt]
 }
 
 #==========================================================================================================================================
@@ -255,6 +256,26 @@ resource "aws_lb_listener" "http_listener" {
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.file-upload-target-group.arn
+  }
+}
+
+# Listener Rule
+resource "aws_lb_listener_rule" "file-upload-redirect-rule" {
+  listener_arn = aws_lb_listener.http_listener.arn
+  action {
+    type = "redirect"
+    redirect {
+      # host = "#{host}"
+      # port = "#{port}"
+      # protocol = "#{protocol}"
+      path = "/uploadapp/"
+      status_code = "HTTP_301"
+    }
+  }
+  condition {
+    path_pattern {
+      values = [ "${aws_route53_record.file-upload-route53-alias.fqdn}" ]
+    }
   }
 }
 
