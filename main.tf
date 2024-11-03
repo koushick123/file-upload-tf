@@ -265,16 +265,14 @@ resource "aws_lb_listener_rule" "file-upload-redirect-rule" {
   action {
     type = "redirect"
     redirect {
-      # host = "#{host}"
-      # port = "#{port}"
-      # protocol = "#{protocol}"
-      path = "/uploadapp/"
-      status_code = "HTTP_301"
+       host = "${aws_lb.file-upload-application-LB.dns_name}"
+       path = "/uploadapp/"
+       status_code = "HTTP_301"
     }
   }
   condition {
-    path_pattern {
-      values = [ "${aws_route53_record.file-upload-route53-alias.fqdn}" ]
+    host_header {
+      values = [ "my-file-upload.com" ]
     }
   }
 }
