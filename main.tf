@@ -173,9 +173,6 @@ resource "aws_instance" "file-upload-admin-instance" {
   subnet_id                   = aws_subnet.file-upload-application-subnet-az-1a.id
   vpc_security_group_ids      = [aws_security_group.admin-sg.id]
   associate_public_ip_address = true
-  # iam_instance_profile        = aws_iam_instance_profile.file-upload-profile.name
-  # user_data                   = var.ec2_user_data
-  # user_data_replace_on_change = true
 }
 
 # TLS Private Key
@@ -203,9 +200,9 @@ resource "aws_iam_instance_profile" "file-upload-profile" {
 # Create AWS Auto scaling group
 resource "aws_autoscaling_group" "file-upload-asg" {
   name                = "File-Upload-ASG"
-  max_size            = 1
-  min_size            = 1
-  desired_capacity    = 1
+  max_size            = 2
+  min_size            = 2
+  desired_capacity    = 2
   vpc_zone_identifier = [aws_subnet.file-upload-application-subnet-az-1b.id]
   capacity_rebalance  = true
   launch_template {
@@ -345,8 +342,6 @@ resource "aws_vpc_security_group_ingress_rule" "default-sg-rds-ingress" {
   ip_protocol       = "tcp"
   from_port         = 3306
   to_port           = 3306
-  # cidr_ipv4 = "${aws_launch_template.ec2_launch_template.}/32"
-  # cidr_ipv4 = "0.0.0.0/0"
   referenced_security_group_id = aws_default_security_group.default-sg-application.id
 }
 
